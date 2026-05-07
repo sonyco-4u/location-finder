@@ -1,0 +1,971 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>ESUTH Parklane Smart Wayfinding + Drug Request System</title>
+
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="" />
+
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: Arial, sans-serif;
+      background: #eef3f8;
+      color: #172033;
+      min-height: 100vh;
+    }
+
+    header {
+      background: linear-gradient(135deg, #0f766e, #134e4a);
+      color: white;
+      padding: 24px 18px;
+    }
+
+    .header-inner { max-width: 1200px; margin: 0 auto; }
+    header h1 { font-size: 30px; margin-bottom: 8px; }
+    header p { max-width: 950px; line-height: 1.6; color: #d9fffb; }
+
+    nav {
+      background: white;
+      box-shadow: 0 4px 16px rgba(15, 23, 42, 0.08);
+      padding: 12px 18px;
+      position: sticky;
+      top: 0;
+      z-index: 800;
+    }
+
+    .nav-inner {
+      max-width: 1200px;
+      margin: 0 auto;
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    .nav-btn {
+      width: auto;
+      padding: 10px 14px;
+      margin: 0;
+      border-radius: 999px;
+      background: #e2e8f0;
+      color: #172033;
+    }
+
+    .nav-btn.active,
+    .nav-btn:hover {
+      background: #0f766e;
+      color: white;
+    }
+
+    .page {
+      display: none;
+      max-width: 1200px;
+      margin: 22px auto;
+      padding: 0 16px 30px;
+    }
+
+    .page.active { display: block; }
+
+    .app-grid {
+      display: grid;
+      grid-template-columns: 360px 1fr;
+      gap: 18px;
+    }
+
+    .panel, .map-card, .directions-card, .card {
+      background: white;
+      border-radius: 18px;
+      box-shadow: 0 8px 24px rgba(15, 23, 42, 0.09);
+      overflow: hidden;
+    }
+
+    .panel, .card { padding: 20px; }
+    .panel h2, .card h2, .directions-card h2 { font-size: 21px; margin-bottom: 12px; }
+    .panel p, .card p { line-height: 1.6; color: #475569; }
+
+    label {
+      display: block;
+      font-size: 14px;
+      font-weight: bold;
+      margin: 15px 0 7px;
+    }
+
+    select, button, input, textarea {
+      width: 100%;
+      padding: 12px;
+      border-radius: 12px;
+      border: 1px solid #cbd5e1;
+      font-size: 15px;
+      font-family: Arial, sans-serif;
+    }
+
+    textarea { min-height: 90px; resize: vertical; }
+
+    button {
+      border: none;
+      background: #0f766e;
+      color: white;
+      font-weight: bold;
+      cursor: pointer;
+      margin-top: 15px;
+    }
+
+    button:hover { background: #115e59; }
+    .secondary-btn { background: #334155; }
+    .secondary-btn:hover { background: #1e293b; }
+    .danger-btn { background: #b91c1c; }
+    .danger-btn:hover { background: #991b1b; }
+
+    .status {
+      margin-top: 15px;
+      padding: 13px;
+      border-radius: 12px;
+      background: #ecfdf5;
+      color: #065f46;
+      line-height: 1.5;
+      font-size: 14px;
+    }
+
+    .status.error { background: #fef2f2; color: #991b1b; }
+
+    #map, #drugMap { height: 620px; width: 100%; }
+
+    .directions-card { margin-top: 18px; padding: 18px; }
+    .direction-list { list-style: none; display: grid; gap: 10px; }
+    .direction-list li {
+      background: #f8fafc;
+      border-left: 5px solid #0f766e;
+      padding: 12px;
+      border-radius: 10px;
+      line-height: 1.5;
+    }
+
+    .qr-box {
+      margin-top: 16px;
+      padding: 14px;
+      border: 1px dashed #94a3b8;
+      border-radius: 14px;
+      background: #f8fafc;
+      text-align: center;
+    }
+
+    .qr-box img {
+      width: 160px;
+      height: 160px;
+      margin-top: 10px;
+      border-radius: 10px;
+      background: white;
+      padding: 8px;
+    }
+
+    .small-text { font-size: 13px; color: #64748b; line-height: 1.5; margin-top: 8px; }
+
+    .cards-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(270px, 1fr));
+      gap: 16px;
+    }
+
+    .pharmacy-card, .request-card {
+      background: #f8fafc;
+      border: 1px solid #e2e8f0;
+      padding: 15px;
+      border-radius: 14px;
+      line-height: 1.55;
+    }
+
+    .badge {
+      display: inline-block;
+      padding: 5px 9px;
+      border-radius: 999px;
+      background: #dcfce7;
+      color: #166534;
+      font-size: 12px;
+      font-weight: bold;
+      margin-bottom: 8px;
+    }
+
+    .badge.pending { background: #fef3c7; color: #92400e; }
+    .badge.none { background: #fee2e2; color: #991b1b; }
+
+    .form-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+    }
+
+    .full { grid-column: 1 / -1; }
+
+    .modal-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(15, 23, 42, 0.65);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      padding: 16px;
+      z-index: 1200;
+    }
+
+    .modal-overlay.show { display: flex; }
+
+    .modal {
+      background: white;
+      width: 100%;
+      max-width: 560px;
+      border-radius: 20px;
+      padding: 22px;
+      box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+    }
+
+    .modal h2 { margin-bottom: 8px; }
+    .modal-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+
+    @media (max-width: 900px) {
+      .app-grid, .form-grid { grid-template-columns: 1fr; }
+      #map, #drugMap { height: 500px; }
+    }
+  
+
+    .ai-toggle {
+      position: fixed;
+      right: 20px;
+      bottom: 20px;
+      width: 62px;
+      height: 62px;
+      border-radius: 50%;
+      background: #0f766e;
+      color: white;
+      border: none;
+      font-size: 26px;
+      box-shadow: 0 12px 30px rgba(15, 23, 42, 0.28);
+      z-index: 1400;
+      cursor: pointer;
+      margin: 0;
+    }
+
+    .ai-assistant {
+      position: fixed;
+      right: 20px;
+      bottom: 92px;
+      width: 360px;
+      max-width: calc(100vw - 32px);
+      height: 520px;
+      background: white;
+      border-radius: 20px;
+      box-shadow: 0 20px 60px rgba(15, 23, 42, 0.28);
+      display: none;
+      flex-direction: column;
+      overflow: hidden;
+      z-index: 1400;
+      border: 1px solid #dbe4ee;
+    }
+
+    .ai-assistant.open { display: flex; }
+
+    .ai-header {
+      background: linear-gradient(135deg, #0f766e, #115e59);
+      color: white;
+      padding: 15px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .ai-header strong { display: block; font-size: 16px; }
+    .ai-header span { font-size: 12px; color: #ccfbf1; }
+
+    .ai-close {
+      width: auto;
+      padding: 5px 9px;
+      margin: 0;
+      border-radius: 8px;
+      background: rgba(255,255,255,0.18);
+    }
+
+    .ai-messages {
+      flex: 1;
+      padding: 14px;
+      overflow-y: auto;
+      background: #f8fafc;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .ai-message {
+      max-width: 86%;
+      padding: 10px 12px;
+      border-radius: 14px;
+      line-height: 1.45;
+      font-size: 14px;
+    }
+
+    .ai-message.bot {
+      background: white;
+      border: 1px solid #e2e8f0;
+      align-self: flex-start;
+    }
+
+    .ai-message.user {
+      background: #0f766e;
+      color: white;
+      align-self: flex-end;
+    }
+
+    .ai-suggestions {
+      padding: 10px;
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      border-top: 1px solid #e2e8f0;
+      background: white;
+    }
+
+    .ai-chip {
+      width: auto;
+      margin: 0;
+      padding: 7px 10px;
+      font-size: 12px;
+      border-radius: 999px;
+      background: #e2e8f0;
+      color: #172033;
+    }
+
+    .ai-input-area {
+      padding: 12px;
+      display: grid;
+      grid-template-columns: 1fr 72px;
+      gap: 8px;
+      border-top: 1px solid #e2e8f0;
+      background: white;
+    }
+
+    .ai-input-area input { border-radius: 12px; }
+    .ai-input-area button { margin: 0; }
+
+    @media (max-width: 520px) {
+      .ai-assistant {
+        right: 10px;
+        left: 10px;
+        width: auto;
+        height: 70vh;
+      }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="header-inner">
+      <h1>ESUTH Parklane Smart Wayfinding + Drug Request System</h1>
+      <p>
+        A browser-based solution for hospital navigation and medicine availability. Patients can find wards, request drugs, and view nearby Enugu pharmacies that have the requested medicine. Pharmacy owners can register and monitor patient drug requests.
+      </p>
+    </div>
+  </header>
+
+  <nav>
+    <div class="nav-inner">
+      <button class="nav-btn active" onclick="showPage('wayfindingPage', this)">Hospital Wayfinding</button>
+      <button class="nav-btn" onclick="showPage('drugRequestPage', this)">Patient Drug Request</button>
+      <button class="nav-btn" onclick="showPage('ownerRegisterPage', this)">Pharmacy Owner Register</button>
+      <button class="nav-btn" onclick="showPage('ownerDashboardPage', this)">Owner Dashboard</button>
+    </div>
+  </nav>
+
+  <!-- PAGE 1: WAYFINDING -->
+  <main id="wayfindingPage" class="page active">
+    <section class="app-grid">
+      <aside class="panel">
+        <h2>Navigation Dashboard</h2>
+
+        <label for="startPoint">Starting Point</label>
+        <select id="startPoint"></select>
+
+        <label for="destination">Destination Department / Ward</label>
+        <select id="destination"></select>
+
+        <button onclick="buildRoute()">Get Directions</button>
+        <button class="secondary-btn" onclick="usePhoneLocation()">Use My Phone Location</button>
+        <button onclick="openDrugModal()">Request a Drug</button>
+
+        <div id="status" class="status">Select your current gate or scan a QR code to begin.</div>
+
+        <div class="qr-box">
+          <strong>Sample QR Code</strong>
+          <p class="small-text">This QR simulates a visitor scanning from the Main Gate.</p>
+          <img id="qrImage" alt="Sample QR Code" />
+        </div>
+
+        <p class="small-text">Coordinates are sample points for prototype demonstration. Real deployment should use verified hospital GIS survey data.</p>
+      </aside>
+
+      <section>
+        <div class="map-card"><div id="map"></div></div>
+        <div class="directions-card">
+          <h2>Turn-by-Turn Directions</h2>
+          <ul id="directions" class="direction-list"><li>No route selected yet.</li></ul>
+        </div>
+      </section>
+    </section>
+  </main>
+
+  <!-- PAGE 2: PATIENT DRUG REQUEST -->
+  <main id="drugRequestPage" class="page">
+    <section class="app-grid">
+      <aside class="panel">
+        <h2>Request a Drug</h2>
+        <p>Patients or visitors can enter the drug they need and see pharmacies in Enugu that currently claim to have it.</p>
+
+        <label for="patientName">Patient / Requester Name</label>
+        <input id="patientName" placeholder="Example: Chinedu Okafor" />
+
+        <label for="drugName">Drug Name</label>
+        <input id="drugName" placeholder="Example: Amoxicillin, Metformin, Paracetamol" />
+
+        <label for="quantity">Quantity / Strength</label>
+        <input id="quantity" placeholder="Example: 500mg x 10 tablets" />
+
+        <label for="patientPhone">Phone Number</label>
+        <input id="patientPhone" placeholder="Example: 08012345678" />
+
+        <label for="patientLocation">Pickup Area</label>
+        <select id="patientLocation">
+          <option>ESUTH Parklane</option>
+          <option>New Haven</option>
+          <option>Ogui Road</option>
+          <option>Independence Layout</option>
+          <option>Abakpa</option>
+          <option>GRA Enugu</option>
+          <option>Trans-Ekulu</option>
+        </select>
+
+        <button onclick="submitDrugRequest()">Submit Drug Request</button>
+        <button class="secondary-btn" onclick="searchDrugAvailability()">Search Available Pharmacies</button>
+
+        <div id="drugStatus" class="status">Enter a drug name to check pharmacy availability.</div>
+      </aside>
+
+      <section>
+        <div class="map-card"><div id="drugMap"></div></div>
+        <div class="directions-card">
+          <h2>Pharmacies with Requested Drug</h2>
+          <div id="pharmacyResults" class="cards-grid"></div>
+        </div>
+      </section>
+    </section>
+  </main>
+
+  <!-- PAGE 3: PHARMACY OWNER REGISTRATION -->
+  <main id="ownerRegisterPage" class="page">
+    <section class="card">
+      <h2>Pharmacy Store Owner Registration</h2>
+      <p>Pharmacy owners can register their store so they can appear in drug availability searches and view patient requests.</p>
+
+      <div class="form-grid">
+        <div>
+          <label for="ownerName">Owner Name</label>
+          <input id="ownerName" placeholder="Example: Mrs. Ngozi Eze" />
+        </div>
+
+        <div>
+          <label for="storeName">Pharmacy Store Name</label>
+          <input id="storeName" placeholder="Example: Parklane Health Pharmacy" />
+        </div>
+
+        <div>
+          <label for="storePhone">Business Phone</label>
+          <input id="storePhone" placeholder="Example: 08098765432" />
+        </div>
+
+        <div>
+          <label for="storeArea">Store Area in Enugu</label>
+          <select id="storeArea">
+            <option>ESUTH Parklane</option>
+            <option>New Haven</option>
+            <option>Ogui Road</option>
+            <option>Independence Layout</option>
+            <option>Abakpa</option>
+            <option>GRA Enugu</option>
+            <option>Trans-Ekulu</option>
+          </select>
+        </div>
+
+        <div class="full">
+          <label for="storeAddress">Store Address</label>
+          <input id="storeAddress" placeholder="Example: 15 Park Avenue, GRA, Enugu" />
+        </div>
+
+        <div class="full">
+          <label for="availableDrugs">Available Drugs</label>
+          <textarea id="availableDrugs" placeholder="Separate with commas: Paracetamol, Amoxicillin, Metformin, Artemether, Ibuprofen"></textarea>
+        </div>
+      </div>
+
+      <button onclick="registerPharmacy()">Register Pharmacy</button>
+      <div id="registerStatus" class="status">Complete the form to register a pharmacy store.</div>
+    </section>
+  </main>
+
+  <!-- PAGE 4: PHARMACY OWNER DASHBOARD -->
+  <main id="ownerDashboardPage" class="page">
+    <section class="card">
+      <h2>Pharmacy Owner Dashboard</h2>
+      <p>Registered pharmacy stores can see drug requests submitted by patients and contact them if they have the medicine available.</p>
+      <button onclick="renderOwnerDashboard()">Refresh Dashboard</button>
+      <button class="danger-btn" onclick="clearDemoData()">Clear Demo Requests</button>
+    </section>
+
+    <section class="directions-card">
+      <h2>Registered Pharmacies</h2>
+      <div id="registeredPharmacies" class="cards-grid"></div>
+    </section>
+
+    <section class="directions-card">
+      <h2>Patient Drug Requests</h2>
+      <div id="ownerRequests" class="cards-grid"></div>
+    </section>
+  </main>
+
+  <!-- DRUG REQUEST POPUP -->
+  <div id="drugModal" class="modal-overlay">
+    <div class="modal">
+      <h2>Quick Drug Request</h2>
+      <p class="small-text">Submit a quick request while using the hospital wayfinding page.</p>
+
+      <label for="modalDrugName">Drug Name</label>
+      <input id="modalDrugName" placeholder="Example: Paracetamol" />
+
+      <label for="modalPhone">Phone Number</label>
+      <input id="modalPhone" placeholder="Example: 08012345678" />
+
+      <label for="modalQuantity">Quantity / Strength</label>
+      <input id="modalQuantity" placeholder="Example: 500mg x 10 tablets" />
+
+      <div class="modal-actions">
+        <button onclick="submitModalDrugRequest()">Submit</button>
+        <button class="secondary-btn" onclick="closeDrugModal()">Cancel</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
+
+  <script>
+    const locations = {
+      mainGate: { name: 'Main Gate QR Point', type: 'gate', coords: [6.43508, 7.49818] },
+      emergencyGate: { name: 'Emergency Gate QR Point', type: 'gate', coords: [6.43558, 7.49902] },
+      outpatient: { name: 'Outpatient Department', type: 'department', coords: [6.43536, 7.49858] },
+      emergency: { name: 'Emergency Unit', type: 'department', coords: [6.43570, 7.49924] },
+      pharmacy: { name: 'Hospital Pharmacy', type: 'department', coords: [6.43485, 7.49886] },
+      radiology: { name: 'Radiology / X-Ray Department', type: 'department', coords: [6.43502, 7.49943] },
+      maternity: { name: 'Maternity Ward', type: 'ward', coords: [6.43455, 7.49926] },
+      laboratory: { name: 'Medical Laboratory', type: 'department', coords: [6.43531, 7.49970] },
+      admin: { name: 'Administrative Block', type: 'department', coords: [6.43462, 7.49845] }
+    };
+
+    const routeGuides = {
+      mainGate_outpatient: ['Start at the Main Gate QR Point.', 'Walk straight along the main hospital access road.', 'Turn slightly right toward the Outpatient Department block.', 'Stop at the Outpatient Department entrance.'],
+      mainGate_emergency: ['Start at the Main Gate QR Point.', 'Proceed forward toward the emergency access road.', 'Turn right at the first internal junction.', 'Continue straight until you reach the Emergency Unit entrance.'],
+      mainGate_pharmacy: ['Start at the Main Gate QR Point.', 'Move forward into the hospital compound.', 'Turn left toward the service block corridor.', 'The Hospital Pharmacy is on the right side of the walkway.']
+    };
+
+    const samplePharmacies = [
+      { storeName: 'Parklane Health Pharmacy', ownerName: 'Demo Owner', phone: '08011112222', area: 'ESUTH Parklane', address: 'Near ESUTH Parklane Main Gate', coords: [6.43525, 7.49780], drugs: ['Paracetamol', 'Amoxicillin', 'Ibuprofen', 'Artemether'] },
+      { storeName: 'New Haven Care Pharmacy', ownerName: 'Demo Owner', phone: '08022223333', area: 'New Haven', address: 'New Haven, Enugu', coords: [6.45260, 7.51100], drugs: ['Metformin', 'Amlodipine', 'Paracetamol', 'Ciprofloxacin'] },
+      { storeName: 'Ogui Road Pharmacy', ownerName: 'Demo Owner', phone: '08033334444', area: 'Ogui Road', address: 'Ogui Road, Enugu', coords: [6.44280, 7.50620], drugs: ['Amoxicillin', 'Azithromycin', 'ORS', 'Paracetamol'] },
+      { storeName: 'GRA Family Pharmacy', ownerName: 'Demo Owner', phone: '08044445555', area: 'GRA Enugu', address: 'GRA, Enugu', coords: [6.45740, 7.49230], drugs: ['Insulin', 'Metformin', 'Losartan', 'Amlodipine'] }
+    ];
+
+    function getPharmacies() {
+      const saved = JSON.parse(localStorage.getItem('registeredPharmacies') || '[]');
+      return [...samplePharmacies, ...saved];
+    }
+
+    function getRequests() {
+      return JSON.parse(localStorage.getItem('drugRequests') || '[]');
+    }
+
+    function saveRequests(requests) {
+      localStorage.setItem('drugRequests', JSON.stringify(requests));
+    }
+
+    function showPage(pageId, btn) {
+      document.querySelectorAll('.page').forEach(page => page.classList.remove('active'));
+      document.getElementById(pageId).classList.add('active');
+      document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+
+      setTimeout(() => {
+        if (pageId === 'drugRequestPage') drugMap.invalidateSize();
+        if (pageId === 'wayfindingPage') map.invalidateSize();
+        if (pageId === 'ownerDashboardPage') renderOwnerDashboard();
+      }, 150);
+    }
+
+    const map = L.map('map').setView([6.43508, 7.49895], 18);
+    let routeLine = null, startMarker = null, destinationMarker = null, phoneMarker = null;
+
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 20, attribution: '&copy; OpenStreetMap contributors' }).addTo(map);
+
+    const startSelect = document.getElementById('startPoint');
+    const destinationSelect = document.getElementById('destination');
+
+    Object.entries(locations).forEach(([key, location]) => {
+      if (location.type === 'gate') startSelect.innerHTML += `<option value="${key}">${location.name}</option>`;
+      else destinationSelect.innerHTML += `<option value="${key}">${location.name}</option>`;
+    });
+
+    Object.values(locations).forEach(location => {
+      const icon = location.type === 'gate' ? '🟢' : '🔴';
+      L.marker(location.coords).addTo(map).bindPopup(`${icon} ${location.name}`);
+    });
+
+    function updateStatus(message, isError = false) {
+      const status = document.getElementById('status');
+      status.textContent = message;
+      status.className = isError ? 'status error' : 'status';
+    }
+
+    function buildRoute() {
+      const startKey = startSelect.value;
+      const destinationKey = destinationSelect.value;
+      const start = locations[startKey];
+      const destination = locations[destinationKey];
+
+      if (routeLine) map.removeLayer(routeLine);
+      if (startMarker) map.removeLayer(startMarker);
+      if (destinationMarker) map.removeLayer(destinationMarker);
+
+      startMarker = L.marker(start.coords).addTo(map).bindPopup(`Start: ${start.name}`).openPopup();
+      destinationMarker = L.marker(destination.coords).addTo(map).bindPopup(`Destination: ${destination.name}`);
+      routeLine = L.polyline([start.coords, destination.coords], { weight: 6, opacity: 0.85 }).addTo(map);
+
+      map.fitBounds(routeLine.getBounds(), { padding: [60, 60] });
+      renderDirections(startKey, destinationKey, start.name, destination.name);
+      updateStatus(`Route generated from ${start.name} to ${destination.name}.`);
+    }
+
+    function renderDirections(startKey, destinationKey, startName, destinationName) {
+      const list = document.getElementById('directions');
+      const guide = routeGuides[`${startKey}_${destinationKey}`] || [`Start at ${startName}.`, 'Follow the highlighted route on the map.', `Continue until you arrive at ${destinationName}.`, 'Ask hospital staff for confirmation if needed.'];
+      list.innerHTML = guide.map(step => `<li>${step}</li>`).join('');
+    }
+
+    function usePhoneLocation() {
+      if (!navigator.geolocation) return updateStatus('Your browser does not support location services.', true);
+      updateStatus('Checking your phone location...');
+      navigator.geolocation.getCurrentPosition(position => {
+        const userCoords = [position.coords.latitude, position.coords.longitude];
+        if (phoneMarker) map.removeLayer(phoneMarker);
+        phoneMarker = L.marker(userCoords).addTo(map).bindPopup('📍 Your phone location').openPopup();
+        map.setView(userCoords, 18);
+        updateStatus('Phone location detected.');
+      }, () => updateStatus('Location permission denied or unavailable.', true));
+    }
+
+    function createSampleQRCode() {
+      const currentPage = window.location.href.split('?')[0];
+      const qrData = encodeURIComponent(`${currentPage}?start=mainGate`);
+      document.getElementById('qrImage').src = `https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=${qrData}`;
+    }
+
+    createSampleQRCode();
+
+    const drugMap = L.map('drugMap').setView([6.441, 7.505], 13);
+    let drugMarkers = [];
+
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 20, attribution: '&copy; OpenStreetMap contributors' }).addTo(drugMap);
+
+    function clearDrugMarkers() {
+      drugMarkers.forEach(marker => drugMap.removeLayer(marker));
+      drugMarkers = [];
+    }
+
+    function setDrugStatus(message, isError = false) {
+      const status = document.getElementById('drugStatus');
+      status.textContent = message;
+      status.className = isError ? 'status error' : 'status';
+    }
+
+    function searchDrugAvailability() {
+      const drug = document.getElementById('drugName').value.trim();
+      if (!drug) return setDrugStatus('Please enter the drug name first.', true);
+
+      const pharmacies = getPharmacies();
+      const matches = pharmacies.filter(pharmacy => pharmacy.drugs.some(item => item.toLowerCase().includes(drug.toLowerCase())));
+      const container = document.getElementById('pharmacyResults');
+      clearDrugMarkers();
+
+      if (matches.length === 0) {
+        container.innerHTML = `<div class="pharmacy-card"><span class="badge none">No Match</span><strong>No pharmacy found yet</strong><br>No registered pharmacy currently lists ${drug}. Your request can still be submitted for owners to see.</div>`;
+        setDrugStatus(`No pharmacy currently shows ${drug} as available. Submit a request so owners can respond.`, true);
+        return;
+      }
+
+      container.innerHTML = matches.map(pharmacy => `
+        <div class="pharmacy-card">
+          <span class="badge">Available</span><br>
+          <strong>${pharmacy.storeName}</strong><br>
+          Area: ${pharmacy.area}<br>
+          Address: ${pharmacy.address}<br>
+          Phone: ${pharmacy.phone}<br>
+          Listed drugs: ${pharmacy.drugs.join(', ')}
+        </div>
+      `).join('');
+
+      matches.forEach(pharmacy => {
+        const marker = L.marker(pharmacy.coords).addTo(drugMap).bindPopup(`<strong>${pharmacy.storeName}</strong><br>${pharmacy.area}<br>Has: ${drug}<br>Phone: ${pharmacy.phone}`);
+        drugMarkers.push(marker);
+      });
+
+      const bounds = L.latLngBounds(matches.map(p => p.coords));
+      drugMap.fitBounds(bounds, { padding: [60, 60] });
+      setDrugStatus(`${matches.length} pharmacy store(s) show availability for ${drug}.`);
+    }
+
+    function submitDrugRequest() {
+      const name = document.getElementById('patientName').value.trim();
+      const drug = document.getElementById('drugName').value.trim();
+      const quantity = document.getElementById('quantity').value.trim();
+      const phone = document.getElementById('patientPhone').value.trim();
+      const location = document.getElementById('patientLocation').value;
+
+      if (!drug || !phone) return setDrugStatus('Drug name and phone number are required.', true);
+
+      const requests = getRequests();
+      requests.unshift({
+        id: Date.now(),
+        name: name || 'Anonymous Patient',
+        drug,
+        quantity: quantity || 'Not specified',
+        phone,
+        location,
+        status: 'Pending',
+        createdAt: new Date().toLocaleString()
+      });
+      saveRequests(requests);
+      setDrugStatus(`Drug request for ${drug} has been submitted. Pharmacy owners can now see it.`);
+      searchDrugAvailability();
+    }
+
+    function openDrugModal() {
+      document.getElementById('drugModal').classList.add('show');
+    }
+
+    function closeDrugModal() {
+      document.getElementById('drugModal').classList.remove('show');
+    }
+
+    function submitModalDrugRequest() {
+      const drug = document.getElementById('modalDrugName').value.trim();
+      const phone = document.getElementById('modalPhone').value.trim();
+      const quantity = document.getElementById('modalQuantity').value.trim();
+
+      if (!drug || !phone) {
+        alert('Drug name and phone number are required.');
+        return;
+      }
+
+      const requests = getRequests();
+      requests.unshift({
+        id: Date.now(),
+        name: 'Quick Request User',
+        drug,
+        quantity: quantity || 'Not specified',
+        phone,
+        location: 'ESUTH Parklane',
+        status: 'Pending',
+        createdAt: new Date().toLocaleString()
+      });
+      saveRequests(requests);
+      closeDrugModal();
+      alert(`Your request for ${drug} has been submitted.`);
+    }
+
+    function registerPharmacy() {
+      const ownerName = document.getElementById('ownerName').value.trim();
+      const storeName = document.getElementById('storeName').value.trim();
+      const phone = document.getElementById('storePhone').value.trim();
+      const area = document.getElementById('storeArea').value;
+      const address = document.getElementById('storeAddress').value.trim();
+      const drugsText = document.getElementById('availableDrugs').value.trim();
+      const status = document.getElementById('registerStatus');
+
+      if (!ownerName || !storeName || !phone || !address || !drugsText) {
+        status.textContent = 'Please complete all registration fields.';
+        status.className = 'status error';
+        return;
+      }
+
+      const areaCoords = {
+        'ESUTH Parklane': [6.43540, 7.49790],
+        'New Haven': [6.45260, 7.51100],
+        'Ogui Road': [6.44280, 7.50620],
+        'Independence Layout': [6.42940, 7.51370],
+        'Abakpa': [6.46390, 7.54850],
+        'GRA Enugu': [6.45740, 7.49230],
+        'Trans-Ekulu': [6.47470, 7.52010]
+      };
+
+      const saved = JSON.parse(localStorage.getItem('registeredPharmacies') || '[]');
+      saved.unshift({
+        ownerName,
+        storeName,
+        phone,
+        area,
+        address,
+        coords: areaCoords[area] || [6.441, 7.505],
+        drugs: drugsText.split(',').map(item => item.trim()).filter(Boolean),
+        registeredAt: new Date().toLocaleString()
+      });
+      localStorage.setItem('registeredPharmacies', JSON.stringify(saved));
+
+      status.textContent = `${storeName} has been registered successfully.`;
+      status.className = 'status';
+      document.getElementById('ownerName').value = '';
+      document.getElementById('storeName').value = '';
+      document.getElementById('storePhone').value = '';
+      document.getElementById('storeAddress').value = '';
+      document.getElementById('availableDrugs').value = '';
+    }
+
+    function renderOwnerDashboard() {
+      const pharmacies = getPharmacies();
+      const requests = getRequests();
+
+      document.getElementById('registeredPharmacies').innerHTML = pharmacies.map(pharmacy => `
+        <div class="pharmacy-card">
+          <span class="badge">Registered</span><br>
+          <strong>${pharmacy.storeName}</strong><br>
+          Owner: ${pharmacy.ownerName}<br>
+          Area: ${pharmacy.area}<br>
+          Phone: ${pharmacy.phone}<br>
+          Drugs: ${pharmacy.drugs.join(', ')}
+        </div>
+      `).join('');
+
+      document.getElementById('ownerRequests').innerHTML = requests.length ? requests.map(request => `
+        <div class="request-card">
+          <span class="badge pending">${request.status}</span><br>
+          <strong>${request.drug}</strong><br>
+          Quantity: ${request.quantity}<br>
+          Requester: ${request.name}<br>
+          Phone: ${request.phone}<br>
+          Location: ${request.location}<br>
+          Time: ${request.createdAt}
+        </div>
+      `).join('') : '<div class="request-card">No patient drug requests yet.</div>';
+    }
+
+    function clearDemoData() {
+      localStorage.removeItem('drugRequests');
+      renderOwnerDashboard();
+    }
+
+
+    function toggleAssistant() {
+      document.getElementById('aiAssistant').classList.toggle('open');
+    }
+
+    function handleAiEnter(event) {
+      if (event.key === 'Enter') sendAiMessage();
+    }
+
+    function askSuggestion(text) {
+      document.getElementById('aiInput').value = text;
+      sendAiMessage();
+    }
+
+    function addAiMessage(text, sender) {
+      const box = document.getElementById('aiMessages');
+      const message = document.createElement('div');
+      message.className = `ai-message ${sender}`;
+      message.innerHTML = text;
+      box.appendChild(message);
+      box.scrollTop = box.scrollHeight;
+    }
+
+    function sendAiMessage() {
+      const input = document.getElementById('aiInput');
+      const text = input.value.trim();
+      if (!text) return;
+
+      addAiMessage(text, 'user');
+      input.value = '';
+
+      setTimeout(() => {
+        addAiMessage(generateAiReply(text), 'bot');
+      }, 350);
+    }
+
+    function generateAiReply(message) {
+      const text = message.toLowerCase();
+
+      if (text.includes('ward') || text.includes('department') || text.includes('navigate') || text.includes('direction') || text.includes('find')) {
+        return `To find a ward or department, open <strong>Hospital Wayfinding</strong>, choose your starting gate, select the department or ward, then click <strong>Get Directions</strong>. The map will draw the route and show step-by-step directions.`;
+      }
+
+      if (text.includes('drug') || text.includes('medicine') || text.includes('request') || text.includes('tablet')) {
+        return `To request medicine, open <strong>Patient Drug Request</strong>, enter the drug name, quantity, phone number, and pickup area, then click <strong>Submit Drug Request</strong>. Pharmacy owners will see your request on their dashboard.`;
+      }
+
+      if (text.includes('pharmacy') && (text.includes('available') || text.includes('stock') || text.includes('have'))) {
+        return `To check availability, go to <strong>Patient Drug Request</strong>, type the drug name, and click <strong>Search Available Pharmacies</strong>. Pharmacies in Enugu that listed the drug will appear on the map and in the result cards.`;
+      }
+
+      if (text.includes('owner') || text.includes('register') || text.includes('store')) {
+        return `Pharmacy owners should open <strong>Pharmacy Owner Register</strong>, fill in owner details, store name, phone number, location, address, and available drugs. After registration, the store can appear in patient searches.`;
+      }
+
+      if (text.includes('dashboard') || text.includes('requests')) {
+        return `Open <strong>Owner Dashboard</strong> to view registered pharmacies and all patient drug requests. Owners can use the patient phone number shown there to respond when they have the requested drug.`;
+      }
+
+      if (text.includes('qr') || text.includes('scan')) {
+        return `The QR code is used as a starting point. When a visitor scans a QR at a gate or hospital point, the system can automatically know where the visitor is starting from and guide them to the selected ward or department.`;
+      }
+
+      if (text.includes('emergency')) {
+        return `For emergencies, select <strong>Emergency Unit</strong> in Hospital Wayfinding. For real medical emergencies, please contact hospital staff immediately rather than relying only on the app.`;
+      }
+
+      return `I can help with four things: finding hospital wards, requesting drugs, checking Enugu pharmacy availability, and guiding pharmacy owners through registration. Try asking: “How do I request a drug?” or “How can I find the pharmacy with Amoxicillin?”`;
+    }
+  </script>
+
+
+  <!-- AI ASSISTANT GUIDE -->
+  <button class="ai-toggle" onclick="toggleAssistant()">🤖</button>
+
+  <section id="aiAssistant" class="ai-assistant">
+    <div class="ai-header">
+      <div>
+        <strong>Parklane AI Guide</strong>
+        <span>Navigation, drug request, and pharmacy help</span>
+      </div>
+      <button class="ai-close" onclick="toggleAssistant()">×</button>
+    </div>
+
+    <div id="aiMessages" class="ai-messages">
+      <div class="ai-message bot">
+        Hello, I am your Parklane AI Guide. I can help you find a ward, request a drug, check pharmacy availability, or register a pharmacy store.
+      </div>
+    </div>
+
+    <div class="ai-suggestions">
+      <button class="ai-chip" onclick="askSuggestion('How do I find a ward?')">Find a ward</button>
+      <button class="ai-chip" onclick="askSuggestion('I want to request a drug')">Request drug</button>
+      <button class="ai-chip" onclick="askSuggestion('How can a pharmacy owner register?')">Owner register</button>
+      <button class="ai-chip" onclick="askSuggestion('Show me available pharmacies')">Find pharmacy</button>
+    </div>
+
+    <div class="ai-input-area">
+      <input id="aiInput" placeholder="Ask the guide..." onkeydown="handleAiEnter(event)" />
+      <button onclick="sendAiMessage()">Send</button>
+    </div>
+  </section>
+</body>
+</html>
